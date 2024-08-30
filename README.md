@@ -14,12 +14,12 @@ Currently configs and database connection hard-coded so you'd have to play aroun
 - Clone the repo and cd into NostrTwentyNine
 - run `swift run App`
 
-### MacOS
+#### MacOS
 
 - Install [Redis-Stack](https://redis.io/docs/latest/operate/oss_and_stack/install/install-stack/mac-os/)
 - Clone the repo and cd into NostrTwentyNine
 - run `swift run App`
 
-### Docker
+#### Docker
 
-I havent currently gotten docker to work yet, but the goal is to make it work so its easy to run everything with a single command
+I haven't currently gotten docker to work yet, but the goal is to make it work so its easy to run everything with a single command
