@@ -18,7 +18,7 @@ Currently configs and database connection hard-coded so you'd have to play aroun
 
 - Install [Redis-Stack](https://redis.io/docs/latest/operate/oss_and_stack/install/install-stack/mac-os/)
 - Clone the repo and cd into NostrTwentyNine
-- run `swift run App'
+- run `swift run App`
 
 ### Docker
 
