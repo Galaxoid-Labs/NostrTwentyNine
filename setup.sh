@@ -17,19 +17,42 @@ EOF
     echo
 }
 
+# Function to get public IP
+get_public_ip() {
+    curl -s https://api.ipify.org
+}
+
+# Function to get domain input
+get_domain_input() {
+    local public_ip=$(get_public_ip)
+    echo "Please enter your domain information:"
+    read -p "Enter your domain name (or press enter to use public IP: $public_ip): " domain
+    if [ -z "$domain" ]; then
+        domain=$public_ip
+        echo "Using public IP: $domain"
+    else
+        echo "Using domain: $domain"
+    fi
+    echo $domain
+}
+
 # Function to check if script is run as root
 check_root() {
+    echo "Checking if script is run as root..."
     if [ "$(id -u)" != "0" ]; then
         echo "This script must be run as root" 1>&2
         exit 1
     fi
+    echo "Script is running as root."
 }
 
 # Function to detect OS
 detect_os() {
+    echo "Detecting operating system..."
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         OS=$NAME
+        echo "Detected OS: $OS"
     else
         echo "Cannot detect OS" 1>&2
         exit 1
@@ -38,6 +61,7 @@ detect_os() {
 
 # Function to install Docker and Docker Compose
 install_docker() {
+    echo "Installing Docker and Docker Compose..."
     case $OS in
         "Ubuntu" | "Debian GNU/Linux")
             apt-get update
@@ -64,6 +88,7 @@ install_docker() {
 
 # Function to install Caddy
 install_caddy() {
+    echo "Installing Caddy..."
     case $OS in
         "Ubuntu" | "Debian GNU/Linux")
             apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
@@ -87,6 +112,7 @@ install_caddy() {
 
 # Function to determine Docker Compose command
 get_docker_compose_cmd() {
+    echo "Determining Docker Compose command..."
     if command -v docker-compose &> /dev/null; then
         echo "docker-compose"
     elif docker compose version &> /dev/null; then
@@ -97,30 +123,16 @@ get_docker_compose_cmd() {
     fi
 }
 
-# Function to get domain input
-get_domain_input() {
-    while true; do
-        read -p "Enter your domain name (e.g., example.com): " domain
-        if [ -z "$domain" ]; then
-            echo "Domain cannot be empty. Please try again."
-        else
-            echo "You entered: $domain"
-            read -p "Is this correct? (y/n): " confirm
-            if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-                break
-            fi
-        fi
-    done
-    echo $domain
-}
-
 # Function to setup Vapor app and configure Caddy
 setup_vapor_app() {
     local domain=$1
+    echo "Setting up Vapor app for domain: $domain"
     local docker_compose_cmd=$(get_docker_compose_cmd)
     
+    echo "Cloning NostrTwentyNine repository..."
     git clone https://github.com/Galaxoid-Labs/NostrTwentyNine.git
     cd NostrTwentyNine
+    echo "Starting Docker containers..."
     $docker_compose_cmd up -d
     echo "Nostr Twenty Nine is now running with Docker Compose"
 
@@ -160,15 +172,17 @@ display_commands() {
 
 # Main execution
 display_header
+
+echo "Beginning domain input process..."
+domain=$(get_domain_input)
+
 check_root
 detect_os
 install_docker
 install_caddy
 
-# Get domain input
-domain=$(get_domain_input)
-
-setup_vapor_app $domain
+echo "Setting up Vapor app..."
+setup_vapor_app "$domain"
 
 echo "Setup complete. Your Nostr Twenty Nine should now be accessible at https://$domain"
 echo "If you encountered any issues with Caddy, please check the output above for troubleshooting information."
