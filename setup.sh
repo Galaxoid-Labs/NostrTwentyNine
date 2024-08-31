@@ -2,6 +2,19 @@
 
 set -e
 
+# Check if the script is being run with a TTY
+if [ -t 0 ]; then
+    # If it is, we're good to go
+    interactive=true
+else
+    # If not, we need to re-run the script in a way that allocates a TTY
+    if [ -z "$NOSTR_SETUP_RUNNING" ]; then
+        export NOSTR_SETUP_RUNNING=1
+        exec <&- && exec <>/dev/tty && exec "$0" "$@"
+        exit
+    fi
+fi
+
 # Function to display ASCII header
 display_header() {
     cat << "EOF"
@@ -27,7 +40,7 @@ get_domain_input() {
     local public_ip=$(get_public_ip)
     echo "Please enter your domain information:"
     echo "Enter your domain name (or press enter to use public IP: $public_ip): "
-    read domain </dev/tty
+    read domain
     if [ -z "$domain" ]; then
         domain=$public_ip
         echo "Using public IP: $domain"
