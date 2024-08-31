@@ -97,6 +97,23 @@ get_docker_compose_cmd() {
     fi
 }
 
+# Function to get domain input
+get_domain_input() {
+    while true; do
+        read -p "Enter your domain name (e.g., example.com): " domain
+        if [ -z "$domain" ]; then
+            echo "Domain cannot be empty. Please try again."
+        else
+            echo "You entered: $domain"
+            read -p "Is this correct? (y/n): " confirm
+            if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+                break
+            fi
+        fi
+    done
+    echo $domain
+}
+
 # Function to setup Vapor app and configure Caddy
 setup_vapor_app() {
     local domain=$1
@@ -148,8 +165,8 @@ detect_os
 install_docker
 install_caddy
 
-# Prompt for domain
-read -p "Enter your domain name: " domain
+# Get domain input
+domain=$(get_domain_input)
 
 setup_vapor_app $domain
 
