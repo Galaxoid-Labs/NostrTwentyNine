@@ -97,7 +97,7 @@ get_docker_compose_cmd() {
     fi
 }
 
-# Function to setup Vapor app
+# Function to setup Vapor app and configure Caddy
 setup_vapor_app() {
     local domain=$1
     local docker_compose_cmd=$(get_docker_compose_cmd)
@@ -108,13 +108,24 @@ setup_vapor_app() {
     echo "Nostr Twenty Nine is now running with Docker Compose"
 
     # Configure Caddy
+    echo "Configuring Caddy..."
     cat > /etc/caddy/Caddyfile <<EOL
 $domain {
     reverse_proxy localhost:8080
 }
 EOL
-    systemctl reload caddy
-    echo "Caddy configured as reverse proxy for $domain"
+    
+    echo "Reloading Caddy..."
+    if ! systemctl reload caddy; then
+        echo "Failed to reload Caddy. Checking Caddy status..."
+        systemctl status caddy.service
+        echo "Checking Caddy logs..."
+        journalctl -xeu caddy.service
+        echo "Please check the Caddy configuration and try to reload it manually."
+        echo "You can edit the Caddyfile at /etc/caddy/Caddyfile"
+    else
+        echo "Caddy configured and reloaded successfully."
+    fi
 }
 
 # Function to display stop/start commands
@@ -143,6 +154,7 @@ read -p "Enter your domain name: " domain
 setup_vapor_app $domain
 
 echo "Setup complete. Your Nostr Twenty Nine should now be accessible at https://$domain"
+echo "If you encountered any issues with Caddy, please check the output above for troubleshooting information."
 echo
 echo "Here are some useful commands to manage your Nostr Twenty Nine instance:"
 display_commands
