@@ -17,18 +17,6 @@ EOF
     echo
 }
 
-# Function to display stop/start commands
-display_commands() {
-    echo "To stop Nostr Twenty Nine, run:"
-    echo "cd /root/NostrTwentyNine && docker-compose down"
-    echo
-    echo "To start Nostr Twenty Nine, run:"
-    echo "cd /root/NostrTwentyNine && docker-compose up -d"
-    echo
-    echo "To view logs, run:"
-    echo "cd /root/NostrTwentyNine && docker-compose logs -f"
-}
-
 # Function to check if script is run as root
 check_root() {
     if [ "$(id -u)" != "0" ]; then
@@ -97,12 +85,26 @@ install_caddy() {
     echo "Caddy installed successfully"
 }
 
+# Function to determine Docker Compose command
+get_docker_compose_cmd() {
+    if command -v docker-compose &> /dev/null; then
+        echo "docker-compose"
+    elif docker compose version &> /dev/null; then
+        echo "docker compose"
+    else
+        echo "Docker Compose not found. Please install Docker Compose and try again." >&2
+        exit 1
+    fi
+}
+
 # Function to setup Vapor app
 setup_vapor_app() {
     local domain=$1
+    local docker_compose_cmd=$(get_docker_compose_cmd)
+    
     git clone https://github.com/Galaxoid-Labs/NostrTwentyNine.git
     cd NostrTwentyNine
-    docker-compose up -d
+    $docker_compose_cmd up -d
     echo "Nostr Twenty Nine is now running with Docker Compose"
 
     # Configure Caddy
@@ -113,6 +115,19 @@ $domain {
 EOL
     systemctl reload caddy
     echo "Caddy configured as reverse proxy for $domain"
+}
+
+# Function to display stop/start commands
+display_commands() {
+    local docker_compose_cmd=$(get_docker_compose_cmd)
+    echo "To stop Nostr Twenty Nine, run:"
+    echo "cd /root/NostrTwentyNine && $docker_compose_cmd down"
+    echo
+    echo "To start Nostr Twenty Nine, run:"
+    echo "cd /root/NostrTwentyNine && $docker_compose_cmd up -d"
+    echo
+    echo "To view logs, run:"
+    echo "cd /root/NostrTwentyNine && $docker_compose_cmd logs -f"
 }
 
 # Main execution
