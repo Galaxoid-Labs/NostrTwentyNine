@@ -20,6 +20,7 @@ enum Entrypoint {
             try? await app.asyncShutdown()
             throw error
         }
+        
         try await app.execute()
         try await app.asyncShutdown()
     }

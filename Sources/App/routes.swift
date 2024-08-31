@@ -13,5 +13,9 @@ func routes(_ app: Application) throws {
 //        }
 //        return "Hello, world!"
 //    }
+    
+    app.get("hello") { req async in
+        "Hello its working!"
+    }
 
 }
