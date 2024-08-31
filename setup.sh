@@ -26,7 +26,8 @@ get_public_ip() {
 get_domain_input() {
     local public_ip=$(get_public_ip)
     echo "Please enter your domain information:"
-    read -p "Enter your domain name (or press enter to use public IP: $public_ip): " domain
+    echo "Enter your domain name (or press enter to use public IP: $public_ip): "
+    read domain </dev/tty
     if [ -z "$domain" ]; then
         domain=$public_ip
         echo "Using public IP: $domain"
