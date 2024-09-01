@@ -4,6 +4,15 @@ set -e
 
 # Function to display ASCII header
 display_header() {
+    
+    # ANSI escape code for magenta
+    MAGENTA='\033[0;35m'
+    # ANSI escape code to reset color
+    RESET='\033[0m'
+
+    # Print the ASCII art in magenta
+    echo -e "${MAGENTA}"
+    
     cat << "EOF"
     _   __           __      ______                    __        _   ___
    / | / /___  _____/ /_____/_  __/      _____  ____  / /___  __/ | / (_)___  ___
@@ -12,6 +21,10 @@ display_header() {
 /_/ |_/\____/____/\__/_/   /_/   |__/|__/\___/_/ /_/\__/\__, /_/ |_/_/_/ /_/\___/
                                                        /____/
 EOF
+    
+    # Reset color after ASCII art
+    echo -e "${RESET}"
+                
     echo
     echo "Welcome to the Nostr Twenty Nine Setup!"
     echo
