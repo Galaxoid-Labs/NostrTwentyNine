@@ -2,80 +2,41 @@
 
 set -e
 
-# Check if the script is being run with a TTY
-if [ -t 0 ]; then
-    # If it is, we're good to go
-    interactive=true
-else
-    # If not, we need to re-run the script in a way that allocates a TTY
-    if [ -z "$NOSTR_SETUP_RUNNING" ]; then
-        export NOSTR_SETUP_RUNNING=1
-        exec <&- && exec <>/dev/tty && exec "$0" "$@"
-        exit
-    fi
-fi
-
 # Function to display ASCII header
 display_header() {
     cat << "EOF"
-     __          _       _____                     _             __ _
-  /\ \ \___  ___| |_ _ _/__   \__      _____ _ __ | |_ _   _  /\ \ (_)_ __   ___
- /  \/ / _ \/ __| __| '__|/ /\/\ \ /\ / / _ \ '_ \| __| | | |/  \/ / | '_ \ / _ \
-/ /\  / (_) \__ \ |_| |  / /    \ V  V /  __/ | | | |_| |_| / /\  /| | | | |  __/
-\_\ \/ \___/|___/\__|_|  \/      \_/\_/ \___|_| |_|\__|\__, \_\ \/ |_|_| |_|\___|
-                                                       |___/
+    _   __           __      ______                    __        _   ___
+   / | / /___  _____/ /_____/_  __/      _____  ____  / /___  __/ | / (_)___  ___
+  /  |/ / __ \/ ___/ __/ ___// / | | /| / / _ \/ __ \/ __/ / / /  |/ / / __ \/ _ \
+ / /|  / /_/ (__  ) /_/ /   / /  | |/ |/ /  __/ / / / /_/ /_/ / /|  / / / / /  __/
+/_/ |_/\____/____/\__/_/   /_/   |__/|__/\___/_/ /_/\__/\__, /_/ |_/_/_/ /_/\___/
+                                                       /____/
 EOF
     echo
     echo "Welcome to the Nostr Twenty Nine Setup!"
     echo
 }
 
-# Function to get public IP
-get_public_ip() {
-    curl -s https://api.ipify.org
-}
-
-# Function to get domain input
-get_domain_input() {
-    local public_ip=$(get_public_ip)
-    echo "Please enter your domain information:"
-    echo "Enter your domain name (or press enter to use public IP: $public_ip): "
-    read domain
-    if [ -z "$domain" ]; then
-        domain=$public_ip
-        echo "Using public IP: $domain"
-    else
-        echo "Using domain: $domain"
-    fi
-    echo $domain
-}
-
 # Function to check if script is run as root
 check_root() {
-    echo "Checking if script is run as root..."
     if [ "$(id -u)" != "0" ]; then
         echo "This script must be run as root" 1>&2
         exit 1
     fi
-    echo "Script is running as root."
 }
 
 # Function to detect OS
 detect_os() {
-    echo "Detecting operating system..."
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         OS=$NAME
-        echo "Detected OS: $OS"
     else
         echo "Cannot detect OS" 1>&2
         exit 1
     fi
 }
 
-# Function to install Docker and Docker Compose
 install_docker() {
-    echo "Installing Docker and Docker Compose..."
     case $OS in
         "Ubuntu" | "Debian GNU/Linux")
             apt-get update
@@ -100,9 +61,7 @@ install_docker() {
     echo "Docker and Docker Compose installed successfully"
 }
 
-# Function to install Caddy
 install_caddy() {
-    echo "Installing Caddy..."
     case $OS in
         "Ubuntu" | "Debian GNU/Linux")
             apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
@@ -124,9 +83,7 @@ install_caddy() {
     echo "Caddy installed successfully"
 }
 
-# Function to determine Docker Compose command
 get_docker_compose_cmd() {
-    echo "Determining Docker Compose command..."
     if command -v docker-compose &> /dev/null; then
         echo "docker-compose"
     elif docker compose version &> /dev/null; then
@@ -137,27 +94,64 @@ get_docker_compose_cmd() {
     fi
 }
 
-# Function to setup Vapor app and configure Caddy
+get_ip() {
+    # Try to get the IP using ip command
+    if command -v ip >/dev/null 2>&1; then
+        IP=$(ip -4 addr show scope global | grep inet | awk '{print $2}' | cut -d/ -f1 | head -n 1)
+    # If ip command fails, try ifconfig
+    elif command -v ifconfig >/dev/null 2>&1; then
+        IP=$(ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | head -n 1)
+    # If both fail, use a more universal method with hostname
+    else
+        IP=$(hostname -I | awk '{print $1}')
+    fi
+
+    # If we still don't have an IP, try to get it from an external service
+    if [ -z "$IP" ]; then
+        IP=$(curl -s https://api.ipify.org)
+    fi
+
+    # Output the IP
+    if [ -n "$IP" ]; then
+        echo "$IP"
+    else
+        echo "Unable to determine IP address"
+        return 1
+    fi
+}
+
+get_domain_input() {
+    while true; do
+        read -p "Enter your domain name (e.g., example.com) or press Enter to use public ip: " domain
+        if [ -z "$domain" ]; then
+            break
+        else
+            read -p "Is this correct? (y/n): " confirm
+            if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+                break
+            fi
+        fi
+    done
+    echo $domain
+}
+
 setup_vapor_app() {
     local domain=$1
-    echo "Setting up Vapor app for domain: $domain"
     local docker_compose_cmd=$(get_docker_compose_cmd)
-    
-    echo "Cloning NostrTwentyNine repository..."
+
     git clone https://github.com/Galaxoid-Labs/NostrTwentyNine.git
     cd NostrTwentyNine
-    echo "Starting Docker containers..."
     $docker_compose_cmd up -d
     echo "Nostr Twenty Nine is now running with Docker Compose"
 
     # Configure Caddy
     echo "Configuring Caddy..."
     cat > /etc/caddy/Caddyfile <<EOL
-$domain {
-    reverse_proxy localhost:8080
-}
+$domain
+
+reverse_proxy :8080
 EOL
-    
+
     echo "Reloading Caddy..."
     if ! systemctl reload caddy; then
         echo "Failed to reload Caddy. Checking Caddy status..."
@@ -171,7 +165,6 @@ EOL
     fi
 }
 
-# Function to display stop/start commands
 display_commands() {
     local docker_compose_cmd=$(get_docker_compose_cmd)
     echo "To stop Nostr Twenty Nine, run:"
@@ -184,22 +177,26 @@ display_commands() {
     echo "cd /root/NostrTwentyNine && $docker_compose_cmd logs -f"
 }
 
-# Main execution
+ip=$(get_ip)
+
 display_header
-
-echo "Beginning domain input process..."
-domain=$(get_domain_input)
-
 check_root
 detect_os
 install_docker
 install_caddy
 
-echo "Setting up Vapor app..."
-setup_vapor_app "$domain"
+domain=$(get_domain_input)
 
-echo "Setup complete. Your Nostr Twenty Nine should now be accessible at https://$domain"
-echo "If you encountered any issues with Caddy, please check the output above for troubleshooting information."
+setup_vapor_app
+
+if [ -z "$domain" ]; then
+    echo "Setup complete. Your Nostr Twenty Nine should now be accessible at http://$ip"
+    echo "Once you get a domain and you've pointed it to this machine you can edit /etc/caddy/Caddyfile"
+    echo "and replace :80 with your domain name"
+    echo "This should automatically setup your relay with ssl connection"
+else
+    echo "Setup complete. Your Nostr Twenty Nine should now be accessible at https://$domain"
+fi
 echo
 echo "Here are some useful commands to manage your Nostr Twenty Nine instance:"
 display_commands
