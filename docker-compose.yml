@@ -12,16 +12,15 @@
 #      Start app: docker-compose up app
 #       Stop all: docker-compose down
 #
-version: '3.7'
 
 x-shared_environment: &shared_environment
   LOG_LEVEL: ${LOG_LEVEL:-debug}
   
 services:
   app:
-    image: nostr-twenty-nine:latest
     build:
       context: .
+      dockerfile: Dockerfile
     environment:
       <<: *shared_environment
       REDIS_HOSTNAME: redis
