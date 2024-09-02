@@ -28,10 +28,10 @@ sub check_and_install_modules {
 
         my $os = detect_os();
         if ($os =~ /Ubuntu|Debian/) {
-            system("apt-get update");
-            system("apt-get install -y libterm-readkey-perl");
+            run_command("/usr/bin/apt-get update");
+            run_command("/usr/bin/apt-get install -y libterm-readkey-perl");
         } elsif ($os =~ /Fedora|Red Hat|CentOS/) {
-            system("dnf install -y perl-Term-ReadKey");
+            run_command("/usr/bin/dnf install -y perl-Term-ReadKey");
         } else {
             die "Unsupported OS for automatic module installation\n";
         }
@@ -50,11 +50,25 @@ sub check_and_install_modules {
 # Function to detect OS
 sub detect_os {
     if (-f "/etc/os-release") {
-        my $os = `grep -E '^NAME=' /etc/os-release | cut -d'"' -f2`;
+        my $os = `/bin/grep -E '^NAME=' /etc/os-release | /usr/bin/cut -d'"' -f2`;
         chomp $os;
         return $os;
     } else {
         die "Cannot detect OS\n";
+    }
+}
+
+# Function to run system commands with error checking
+sub run_command {
+    my ($command) = @_;
+    system($command);
+    if ($? == -1) {
+        die "Failed to execute: $command\n";
+    } elsif ($? & 127) {
+        die sprintf("Child died with signal %d, %s coredump\n",
+            ($? & 127),  ($? & 128) ? 'with' : 'without');
+    } elsif ($? != 0) {
+        die sprintf("Command failed: $command (exit code: %d)\n", $? >> 8);
     }
 }
 
@@ -83,24 +97,21 @@ sub install_docker {
     my $os = shift;
     print "Installing Docker and Docker Compose...\n";
     if ($os =~ /Ubuntu|Debian/) {
-        system(
-            "apt-get update",
-            "apt-get install -y apt-transport-https ca-certificates curl software-properties-common",
-            "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg",
-            "echo \"deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \$(lsb_release -cs) stable\" | tee /etc/apt/sources.list.d/docker.list > /dev/null",
-            "apt-get update",
-            "apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin"
-        );
+        run_command("/usr/bin/apt-get update");
+        run_command("/usr/bin/apt-get install -y apt-transport-https ca-certificates curl software-properties-common");
+        run_command("/usr/bin/curl -fsSL https://download.docker.com/linux/ubuntu/gpg | /usr/bin/gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg");
+        run_command("echo \"deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \$(/usr/bin/lsb_release -cs) stable\" | /usr/bin/tee /etc/apt/sources.list.d/docker.list > /dev/null");
+        run_command("/usr/bin/apt-get update");
+        run_command("/usr/bin/apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin");
     } elsif ($os =~ /Fedora|Red Hat|CentOS/) {
-        system(
-            "dnf -y install dnf-plugins-core",
-            "dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo",
-            "dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin"
-        );
+        run_command("/usr/bin/dnf -y install dnf-plugins-core");
+        run_command("/usr/bin/dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo");
+        run_command("/usr/bin/dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin");
     } else {
         die "Unsupported OS: $os\n";
     }
-    system("systemctl enable docker", "systemctl start docker");
+    run_command("/bin/systemctl enable docker");
+    run_command("/bin/systemctl start docker");
     print "Docker and Docker Compose installed successfully\n";
 }
 
@@ -109,19 +120,15 @@ sub install_caddy {
     my $os = shift;
     print "Installing Caddy...\n";
     if ($os =~ /Ubuntu|Debian/) {
-        system(
-            "apt-get install -y debian-keyring debian-archive-keyring apt-transport-https",
-            "curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg",
-            "curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list",
-            "apt-get update",
-            "apt-get install -y caddy"
-        );
+        run_command("/usr/bin/apt-get install -y debian-keyring debian-archive-keyring apt-transport-https");
+        run_command("/usr/bin/curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | /usr/bin/gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg");
+        run_command("/usr/bin/curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | /usr/bin/tee /etc/apt/sources.list.d/caddy-stable.list");
+        run_command("/usr/bin/apt-get update");
+        run_command("/usr/bin/apt-get install -y caddy");
     } elsif ($os =~ /Fedora|Red Hat|CentOS/) {
-        system(
-            "dnf install -y 'dnf-command(copr)'",
-            "dnf copr enable -y \@caddy/caddy",
-            "dnf install -y caddy"
-        );
+        run_command("/usr/bin/dnf install -y 'dnf-command(copr)'");
+        run_command("/usr/bin/dnf copr enable -y \@caddy/caddy");
+        run_command("/usr/bin/dnf install -y caddy");
     } else {
         die "Unsupported OS: $os\n";
     }
@@ -130,7 +137,7 @@ sub install_caddy {
 
 # Function to get public IP
 sub get_public_ip {
-    my $ip = `curl -s https://api.ipify.org`;
+    my $ip = `/usr/bin/curl -s https://api.ipify.org`;
     chomp $ip;
     return $ip;
 }
@@ -152,11 +159,9 @@ sub setup_vapor_app {
     my $docker_compose_cmd = get_docker_compose_cmd();
     
     print "Setting up Nostr Twenty Nine...\n";
-    system(
-        "git clone https://github.com/Galaxoid-Labs/NostrTwentyNine.git",
-        "cd NostrTwentyNine",
-        "$docker_compose_cmd up -d"
-    );
+    run_command("/usr/bin/git clone https://github.com/Galaxoid-Labs/NostrTwentyNine.git");
+    chdir("NostrTwentyNine") or die "Can't chdir to NostrTwentyNine: $!";
+    run_command("$docker_compose_cmd up -d");
 
     # Configure Caddy
     open my $fh, '>', '/etc/caddy/Caddyfile' or die "Could not open file '/etc/caddy/Caddyfile' $!";
@@ -167,7 +172,7 @@ sub setup_vapor_app {
     }
     close $fh;
     
-    system("systemctl reload caddy");
+    run_command("/bin/systemctl reload caddy");
     print "Nostr Twenty Nine setup complete\n";
 }
 
