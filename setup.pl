@@ -251,8 +251,12 @@ if (check_existing_installation()) {
         if (lc($confirm) eq 'y') {
             cleanup();
         } else {
-            print "Cleanup cancelled. Proceeding with installation...\n";
+            print "Install cancelled...\n";
+            exit;
         }
+    } else {
+        print "Install cancelled...\n";
+        exit;
     }
 } else {
     print "No existing installation detected. Proceeding with fresh installation...\n";
