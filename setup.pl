@@ -3,64 +3,19 @@
 use strict;
 use warnings;
 
-# Check if running as root
-if ($> != 0) {
-    print "This script must be run as root. Please use sudo.\n";
-    exit 1;
-}
-
-# Function to check and install required modules
-sub check_and_install_modules {
-    my @required_modules = ('Term::ReadKey', 'Term::ANSIColor');
-    my @missing_modules;
-
-    for my $module (@required_modules) {
-        eval "require $module";
-        if ($@) {
-            push @missing_modules, $module;
-        }
-    }
-
-    if (@missing_modules) {
-        print "The following Perl modules are required and will be installed:\n";
-        print join(", ", @missing_modules) . "\n";
-        print "Installing modules...\n";
-
-        my $os = detect_os();
-        if ($os =~ /Ubuntu|Debian/) {
-            run_command("/usr/bin/apt-get update");
-            run_command("/usr/bin/apt-get install -y libterm-readkey-perl");
-        } elsif ($os =~ /Fedora|Red Hat|CentOS/) {
-            run_command("/usr/bin/dnf install -y perl-Term-ReadKey");
-        } else {
-            die "Unsupported OS for automatic module installation\n";
-        }
-
-        # Verify installation
-        for my $module (@missing_modules) {
-            eval "require $module";
-            if ($@) {
-                die "Failed to install $module. Please install it manually and try again.\n";
-            }
-        }
-        print "Modules installed successfully.\n";
-    }
-}
-
-# Function to detect OS
-sub detect_os {
-    if (-f "/etc/os-release") {
-        my $os = `/bin/grep -E '^NAME=' /etc/os-release | /usr/bin/cut -d'"' -f2`;
-        chomp $os;
-        return $os;
-    } else {
-        die "Cannot detect OS\n";
-    }
+# Function to find the full path of a command
+sub which {
+    my ($cmd) = @_;
+    my $path = `which $cmd 2>/dev/null`;
+    chomp $path;
+    return $path if $path;
+    die "Cannot find $cmd in PATH\n";
 }
 
 # Function to run system commands with error checking
 sub run_command {
     my ($command) = @_;
+    print "Executing: $command\n";  # Debug output
     system($command);
     if ($? == -1) {
         die "Failed to execute: $command\n";
@@ -72,24 +27,59 @@ sub run_command {
     }
 }
 
-# Check and install required modules
-check_and_install_modules();
+# Function to cleanup previous installation
+sub cleanup {
+    print "Cleaning up previous installation...\n";
+    
+    # Remove NostrTwentyNine directory
+    if (-d "NostrTwentyNine") {
+        run_command(which('rm') . " -rf NostrTwentyNine");
+    }
+    
+    # Remove Caddy configuration
+    if (-f "/etc/caddy/Caddyfile") {
+        run_command(which('rm') . " -f /etc/caddy/Caddyfile");
+    }
+    
+    # Docker cleanup
+    if (system("which docker > /dev/null 2>&1") == 0) {
+        # Stop all running containers
+        run_command(which('docker') . " stop \$(docker ps -aq)") if system("docker ps -q") == 0;
+        
+        # Remove all containers
+        run_command(which('docker') . " rm \$(docker ps -aq)") if system("docker ps -aq") == 0;
+        
+        # Remove all images
+        run_command(which('docker') . " rmi \$(docker images -q)") if system("docker images -q") == 0;
+        
+        # Remove all volumes
+        run_command(which('docker') . " volume prune -f");
+        
+        # Remove all networks
+        run_command(which('docker') . " network prune -f");
+        
+        # Remove all build cache
+        run_command(which('docker') . " builder prune -af");
+    }
+    
+    print "Cleanup complete.\n";
+}
 
-# Now we can safely use these modules
-use Term::ReadKey;
-use Term::ANSIColor;
+# Check if running as root
+if ($> != 0) {
+    print "This script must be run as root. Please use sudo.\n";
+    exit 1;
+}
 
-# Function to display ASCII header
-sub display_header {
-    print colored(<<'EOF', 'bold blue');
-     __          _       _____                     _             __ _
-  /\ \ \___  ___| |_ _ _/__   \__      _____ _ __ | |_ _   _  /\ \ (_)_ __   ___
- /  \/ / _ \/ __| __| '__|/ /\/\ \ /\ / / _ \ '_ \| __| | | |/  \/ / | '_ \ / _ \
-/ /\  / (_) \__ \ |_| |  / /    \ V  V /  __/ | | | |_| |_| / /\  /| | | | |  __/
-\_\ \/ \___/|___/\__|_|  \/      \_/\_/ \___|_| |_|\__|\__, \_\ \/ |_|_| |_|\___|
-                                                       |___/
-EOF
-    print "\nWelcome to the Nostr Twenty Nine Setup!\n\n";
+# Function to detect OS
+sub detect_os {
+    if (-f "/etc/os-release") {
+        my $os = `grep -E '^NAME=' /etc/os-release | cut -d'"' -f2`;
+        chomp $os;
+        return $os;
+    } else {
+        die "Cannot detect OS\n";
+    }
 }
 
 # Function to install Docker and Docker Compose
@@ -97,21 +87,21 @@ sub install_docker {
     my $os = shift;
     print "Installing Docker and Docker Compose...\n";
     if ($os =~ /Ubuntu|Debian/) {
-        run_command("/usr/bin/apt-get update");
-        run_command("/usr/bin/apt-get install -y apt-transport-https ca-certificates curl software-properties-common");
-        run_command("/usr/bin/curl -fsSL https://download.docker.com/linux/ubuntu/gpg | /usr/bin/gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg");
-        run_command("echo \"deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \$(/usr/bin/lsb_release -cs) stable\" | /usr/bin/tee /etc/apt/sources.list.d/docker.list > /dev/null");
-        run_command("/usr/bin/apt-get update");
-        run_command("/usr/bin/apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin");
+        run_command(which('apt-get') . " update");
+        run_command(which('apt-get') . " install -y apt-transport-https ca-certificates curl software-properties-common");
+        run_command(which('curl') . " -fsSL https://download.docker.com/linux/ubuntu/gpg | " . which('gpg') . " --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg");
+        run_command("echo \"deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \$(lsb_release -cs) stable\" | " . which('tee') . " /etc/apt/sources.list.d/docker.list > /dev/null");
+        run_command(which('apt-get') . " update");
+        run_command(which('apt-get') . " install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin");
     } elsif ($os =~ /Fedora|Red Hat|CentOS/) {
-        run_command("/usr/bin/dnf -y install dnf-plugins-core");
-        run_command("/usr/bin/dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo");
-        run_command("/usr/bin/dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin");
+        run_command(which('dnf') . " -y install dnf-plugins-core");
+        run_command(which('dnf') . " config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo");
+        run_command(which('dnf') . " install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin");
     } else {
         die "Unsupported OS: $os\n";
     }
-    run_command("/bin/systemctl enable docker");
-    run_command("/bin/systemctl start docker");
+    run_command(which('systemctl') . " enable docker");
+    run_command(which('systemctl') . " start docker");
     print "Docker and Docker Compose installed successfully\n";
 }
 
@@ -120,15 +110,15 @@ sub install_caddy {
     my $os = shift;
     print "Installing Caddy...\n";
     if ($os =~ /Ubuntu|Debian/) {
-        run_command("/usr/bin/apt-get install -y debian-keyring debian-archive-keyring apt-transport-https");
-        run_command("/usr/bin/curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | /usr/bin/gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg");
-        run_command("/usr/bin/curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | /usr/bin/tee /etc/apt/sources.list.d/caddy-stable.list");
-        run_command("/usr/bin/apt-get update");
-        run_command("/usr/bin/apt-get install -y caddy");
+        run_command(which('apt-get') . " install -y debian-keyring debian-archive-keyring apt-transport-https");
+        run_command(which('curl') . " -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | " . which('gpg') . " --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg");
+        run_command(which('curl') . " -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | " . which('tee') . " /etc/apt/sources.list.d/caddy-stable.list");
+        run_command(which('apt-get') . " update");
+        run_command(which('apt-get') . " install -y caddy");
     } elsif ($os =~ /Fedora|Red Hat|CentOS/) {
-        run_command("/usr/bin/dnf install -y 'dnf-command(copr)'");
-        run_command("/usr/bin/dnf copr enable -y \@caddy/caddy");
-        run_command("/usr/bin/dnf install -y caddy");
+        run_command(which('dnf') . " install -y 'dnf-command(copr)'");
+        run_command(which('dnf') . " copr enable -y \@caddy/caddy");
+        run_command(which('dnf') . " install -y caddy");
     } else {
         die "Unsupported OS: $os\n";
     }
@@ -137,7 +127,7 @@ sub install_caddy {
 
 # Function to get public IP
 sub get_public_ip {
-    my $ip = `/usr/bin/curl -s https://api.ipify.org`;
+    my $ip = `curl -s https://api.ipify.org`;
     chomp $ip;
     return $ip;
 }
@@ -159,7 +149,7 @@ sub setup_vapor_app {
     my $docker_compose_cmd = get_docker_compose_cmd();
     
     print "Setting up Nostr Twenty Nine...\n";
-    run_command("/usr/bin/git clone https://github.com/Galaxoid-Labs/NostrTwentyNine.git");
+    run_command(which('git') . " clone https://github.com/Galaxoid-Labs/NostrTwentyNine.git");
     chdir("NostrTwentyNine") or die "Can't chdir to NostrTwentyNine: $!";
     run_command("$docker_compose_cmd up -d");
 
@@ -172,7 +162,7 @@ sub setup_vapor_app {
     }
     close $fh;
     
-    run_command("/bin/systemctl reload caddy");
+    run_command(which('systemctl') . " reload caddy");
     print "Nostr Twenty Nine setup complete\n";
 }
 
@@ -183,10 +173,39 @@ sub get_docker_compose_cmd {
     die "Docker Compose not found. Please install Docker Compose and try again.\n";
 }
 
-# Main execution
-display_header();
+# Function to check for existing installation
+sub check_existing_installation {
+    my $existing = 0;
+    $existing = 1 if -d "NostrTwentyNine";
+    $existing = 1 if -f "/etc/caddy/Caddyfile";
+    $existing = 1 if system("docker ps -a | grep -q NostrTwentyNine") == 0;
+    return $existing;
+}
 
+# Main execution
 my $os = detect_os();
+my $public_ip = get_public_ip();
+
+if (check_existing_installation()) {
+    print "Existing installation detected.\n";
+    print "Do you want to perform a clean installation? This will remove the existing setup. (y/n): ";
+    my $clean_install = <STDIN>;
+    chomp $clean_install;
+    if (lc($clean_install) eq 'y') {
+        print "WARNING: This will remove ALL Docker containers, images, volumes, and networks on this system.\n";
+        print "Are you sure you want to proceed? (y/n): ";
+        my $confirm = <STDIN>;
+        chomp $confirm;
+        if (lc($confirm) eq 'y') {
+            cleanup();
+        } else {
+            print "Cleanup cancelled. Proceeding with installation...\n";
+        }
+    }
+} else {
+    print "No existing installation detected. Proceeding with fresh installation...\n";
+}
+
 my $domain = get_domain_input();
 
 install_docker($os);
@@ -194,18 +213,15 @@ install_caddy($os);
 
 setup_vapor_app($domain);
 
-print colored("\nSetup complete. Your Nostr Twenty Nine should now be accessible at ", 'green');
-print colored($domain ? "https://$domain\n" : "http://[Your Server IP]\n", 'green bold');
+print "\nSetup complete. Your Nostr Twenty Nine should now be accessible at ";
+print $domain ? "https://$domain\n" : "http://$public_ip\n";
 
 # Display commands
 my $docker_compose_cmd = get_docker_compose_cmd();
-print colored("\nUseful Commands:\n", 'yellow');
+print "\nUseful Commands:\n";
 print "To stop: cd /root/NostrTwentyNine && $docker_compose_cmd down\n";
 print "To start: cd /root/NostrTwentyNine && $docker_compose_cmd up -d\n";
 print "To view logs: cd /root/NostrTwentyNine && $docker_compose_cmd logs -f\n";
 
-print colored("\nPress any key to exit...", 'bold');
-ReadMode('cbreak');
-ReadKey(0);
-ReadMode('normal');
-print "\n";
+print "\nPress Enter to exit...";
+<STDIN>;
