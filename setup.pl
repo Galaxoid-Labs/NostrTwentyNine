@@ -274,15 +274,3 @@ print "\nUseful Commands:\n";
 print "To stop: cd /root/NostrTwentyNine && $docker_compose_cmd down\n";
 print "To start: cd /root/NostrTwentyNine && $docker_compose_cmd up -d\n";
 print "To view logs: cd /root/NostrTwentyNine && $docker_compose_cmd logs -f\n";
-
-print "\nPress Enter to exit...";
-<STDIN>;
-
-# Delete the setup.pl file
-my $setup_file = $0;  # $0 contains the name of the script being executed
-if (-e $setup_file) {
-    unlink $setup_file or warn "Could not delete $setup_file: $!";
-    print "Setup script deleted.\n";
-} else {
-    print "Setup script not found. It may have already been deleted.\n";
-}
