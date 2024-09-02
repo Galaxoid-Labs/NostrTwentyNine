@@ -3,6 +3,13 @@ import Redis
 import Nostr
 
 public func configure(_ app: Application) async throws {
+    
+#if !os(macOS)
+    var rlimit = rlimit(rlim_cur: 0, rlim_max: 0)
+    getrlimit(__rlimit_resource_t(7), &rlimit)
+    rlimit.rlim_cur = 4096
+    setrlimit(__rlimit_resource_t(7), &rlimit)
+#endif
    
     let redisURL = Environment.get("REDIS_HOSTNAME") ?? "127.0.0.1"
     let redisPORT = Environment.get("REDIS_PORT").flatMap(Int.init) ?? 6379
