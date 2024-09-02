@@ -200,7 +200,7 @@ install_caddy
 
 domain=$(get_domain_input)
 
-setup_vapor_app
+setup_vapor_app $domain
 
 if [ -z "$domain" ]; then
     echo "Setup complete. Your Nostr Twenty Nine should now be accessible at http://$ip"
