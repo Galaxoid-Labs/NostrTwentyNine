@@ -82,6 +82,56 @@ sub detect_os {
     }
 }
 
+# Function to check and install Term::ANSIColor
+sub ensure_term_ansicolor {
+    eval {
+        require Term::ANSIColor;
+        Term::ANSIColor->import();
+    };
+    if ($@) {
+        print "Term::ANSIColor is not installed. Attempting to install...\n";
+        my $os = detect_os();
+        if ($os =~ /Ubuntu|Debian/) {
+            run_command(which('apt-get') . " update");
+            run_command(which('apt-get') . " install -y libterm-ansicolor-perl");
+        } elsif ($os =~ /Fedora|Red Hat|CentOS/) {
+            run_command(which('dnf') . " install -y perl-Term-ANSIColor");
+        } else {
+            print "Unable to automatically install Term::ANSIColor on this OS.\n";
+            print "You can try installing it manually with: cpan Term::ANSIColor\n";
+            return;
+        }
+        
+        # Check again if it's installed
+        eval {
+            require Term::ANSIColor;
+            Term::ANSIColor->import();
+        };
+        if ($@) {
+            print "Failed to install Term::ANSIColor. Continuing without color support.\n";
+        } else {
+            print "Term::ANSIColor installed successfully.\n";
+        }
+    }
+}
+
+ensure_term_ansicolor();
+
+use Term::ANSIColor;
+
+# Function to display ASCII header
+sub display_header {
+    print colored(<<'EOF', 'bold blue');
+     __          _       _____                     _             __ _
+  /\ \ \___  ___| |_ _ _/__   \__      _____ _ __ | |_ _   _  /\ \ (_)_ __   ___
+ /  \/ / _ \/ __| __| '__|/ /\/\ \ /\ / / _ \ '_ \| __| | | |/  \/ / | '_ \ / _ \
+/ /\  / (_) \__ \ |_| |  / /    \ V  V /  __/ | | | |_| |_| / /\  /| | | | |  __/
+\_\ \/ \___/|___/\__|_|  \/      \_/\_/ \___|_| |_|\__|\__, \_\ \/ |_|_| |_|\___|
+                                                       |___/
+EOF
+    print "\nWelcome to the Nostr Twenty Nine Setup!\n\n";
+}
+
 # Function to install Docker and Docker Compose
 sub install_docker {
     my $os = shift;
@@ -183,6 +233,8 @@ sub check_existing_installation {
 }
 
 # Main execution
+display_header();
+
 my $os = detect_os();
 my $public_ip = get_public_ip();
 

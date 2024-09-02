@@ -20,6 +20,10 @@ Currently configs and database connection hard-coded so you'd have to play aroun
 - Clone the repo and cd into NostrTwentyNine
 - run `swift run App`
 
-#### Docker
+#### Single Command Docker + https domain
 
-I haven't currently gotten docker to work yet, but the goal is to make it work so its easy to run everything with a single command
+If you want to get up and running quick you can run the following command on a fresh Ubunut/Debain/Fedora server.
+
+`curl -sSL https://raw.githubusercontent.com/Galaxoid-Labs/NostrTwentyNine/main/setup.pl -o setup.pl && chmod +x setup.pl && ./setup.pl`
+
+As always its important to inspect commands run from the internet. You can take a look at the perl script [here](https://raw.githubusercontent.com/Galaxoid-Labs/NostrTwentyNine/main/setup.pl)
